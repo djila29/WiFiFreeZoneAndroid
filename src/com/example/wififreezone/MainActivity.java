@@ -6,6 +6,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -14,8 +15,14 @@ import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPut;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.params.HttpConnectionParams;
 import org.apache.http.util.EntityUtils;
+import org.apache.http.message.BasicHeader;
+import org.apache.http.protocol.HTTP;
+import org.json.JSONObject;
 
 import com.expample.model.Network;
 
@@ -28,6 +35,7 @@ import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WpsInfo;
 import android.os.Bundle;
+import android.os.StrictMode;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
@@ -44,6 +52,7 @@ public class MainActivity extends Activity {
 	ListView networksListView = null;
 	Button refreshButton = null;
 	Button connectButton = null;
+	Button shareButton = null;
 	
 	ArrayAdapter<String> netoworkAdapter = null;
 	View lastSelectedItem = null;
@@ -63,6 +72,7 @@ public class MainActivity extends Activity {
 		networksListView = (ListView) findViewById(R.id.listView1);
 		refreshButton = (Button) findViewById(R.id.refreshButton);
 		connectButton = (Button) findViewById(R.id.connectButton);
+		shareButton = (Button) findViewById(R.id.shareButton);
 		
 		mainWifiObj = (WifiManager) getSystemService(Context.WIFI_SERVICE);
 		
@@ -154,6 +164,66 @@ public class MainActivity extends Activity {
 						break;
 					}
 				}
+			}
+		});
+		
+		
+		//ovdje nesto ne radi kako treba, NetworkResources kao da samo SSID dobije mapiran, svi ostali budu null pa pada na sql exception
+		shareButton.setOnClickListener(new View.OnClickListener() {
+			
+			@Override
+			public void onClick(View v) {
+				
+				Thread thread = new Thread(new Runnable(){
+				    @Override
+				    public void run() {
+				        try {
+				            //Your code goes here
+				        	TextView textview1 = (TextView) lastSelectedItem.findViewById(R.id.rowTextView);
+			            	String [] networkDetails = textview1.getText().toString().split("\n");
+							final String SSID = networkDetails[0];
+							
+							HttpClient client = new DefaultHttpClient();
+			                HttpConnectionParams.setConnectionTimeout(client.getParams(), 10000); //Timeout Limit
+			                HttpResponse response;
+			                JSONObject jason = new JSONObject();
+
+			                try {
+			                    HttpPut put = new HttpPut("http://192.168.1.100:8080/FreeZoneServices/api/networks/shareNetwork");
+			                    jason.put("SSID", "test");
+								jason.put("Password", SSID);
+								jason.put("Latitude", SSID);
+								jason.put("Longitude", SSID);
+								jason.put("Validity", SSID);
+			                    StringEntity se = new StringEntity( jason.toString());
+			                    se.setContentType(new BasicHeader(HTTP.CONTENT_TYPE, "application/json"));
+			                    put.setHeader("Content-Type", "application/json");
+			                    put.setHeader("Accept", "application/json");
+			                    put.setEntity(se);
+			                    response = client.execute(put);
+
+			                    
+			                    if(response!=null){
+			                        InputStream in = response.getEntity().getContent(); //Get the data in the entity
+			                    }
+
+			                } catch(final Exception e) {
+			                    e.printStackTrace();
+			                    mainAct.runOnUiThread(new Runnable() {
+								    public void run() {
+								        Toast.makeText(mainAct, e.getMessage(), Toast.LENGTH_SHORT).show();
+								        
+								    }
+								});
+			                }
+				        } catch (Exception e) {
+				            e.printStackTrace();
+				        }
+				    }
+				});
+
+				thread.start(); 
+				
 			}
 		});
 		
