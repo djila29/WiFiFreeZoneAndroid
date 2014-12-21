@@ -20,15 +20,20 @@ import org.apache.http.util.EntityUtils;
 import com.expample.model.Network;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.net.wifi.ScanResult;
+import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
+import android.net.wifi.WpsInfo;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -38,6 +43,7 @@ public class MainActivity extends Activity {
 	
 	ListView networksListView = null;
 	Button refreshButton = null;
+	Button connectButton = null;
 	
 	ArrayAdapter<String> netoworkAdapter = null;
 	View lastSelectedItem = null;
@@ -56,6 +62,7 @@ public class MainActivity extends Activity {
 		
 		networksListView = (ListView) findViewById(R.id.listView1);
 		refreshButton = (Button) findViewById(R.id.refreshButton);
+		connectButton = (Button) findViewById(R.id.connectButton);
 		
 		mainWifiObj = (WifiManager) getSystemService(Context.WIFI_SERVICE);
 		
@@ -78,7 +85,7 @@ public class MainActivity extends Activity {
 			public void run() {
 				try {
 					HttpClient client = new DefaultHttpClient();
-					HttpGet hget = new HttpGet("http://192.168.1.123:8080/FreeZoneServices/api/networks/getAllNetworks");
+					HttpGet hget = new HttpGet("http://192.168.1.100:8080/FreeZoneServices/api/networks/getAllNetworks");
 					hget.setHeader("Content-Type", "application/json");
 					hget.setHeader("Accept", "application/json");
 					
@@ -147,6 +154,71 @@ public class MainActivity extends Activity {
 						break;
 					}
 				}
+			}
+		});
+		
+		connectButton.setOnClickListener(new View.OnClickListener() {
+			
+			@Override
+			public void onClick(View v) {
+				
+				AlertDialog.Builder alert = new AlertDialog.Builder(mainAct);				
+
+				// Set an EditText view to get user input 
+				final EditText input = new EditText(mainAct);
+				alert.setView(input);
+				
+
+            	TextView textview1 = (TextView) lastSelectedItem.findViewById(R.id.rowTextView);
+            	String [] networkDetails = textview1.getText().toString().split("\n");
+				final String SSID = networkDetails[0];
+				
+				alert.setTitle("Connect to " + SSID);
+				alert.setMessage("Enter password:");
+					
+				alert.setPositiveButton("Connect", new DialogInterface.OnClickListener() {
+				public void onClick(DialogInterface dialog, int whichButton) {
+					String password = input.getText().toString();
+				 	// Do something with value!
+				  	WifiConfiguration tmpConf = new WifiConfiguration();
+					tmpConf.SSID = "\"".concat(SSID).concat("\"");
+					tmpConf.status = WifiConfiguration.Status.DISABLED;
+					tmpConf.priority = 40;
+					tmpConf.allowedProtocols.set(WifiConfiguration.Protocol.RSN);
+					tmpConf.allowedProtocols.set(WifiConfiguration.Protocol.WPA);
+					tmpConf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.WPA_PSK);
+					tmpConf.allowedPairwiseCiphers.set(WifiConfiguration.PairwiseCipher.CCMP);
+					tmpConf.allowedPairwiseCiphers.set(WifiConfiguration.PairwiseCipher.TKIP);
+					tmpConf.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.WEP40);
+					tmpConf.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.WEP104);
+					tmpConf.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.CCMP);
+					tmpConf.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.TKIP);
+					 
+					tmpConf.preSharedKey = "\"".concat(password).concat("\"");
+					
+					int netID = mainWifiObj.addNetwork(tmpConf);
+					if (netID != -1) {
+						 // success, can call wfMgr.enableNetwork(networkId, true) to connect
+						mainWifiObj.enableNetwork(netID, true);
+					} else {
+						mainAct.runOnUiThread(new Runnable() {
+						    public void run() {
+						        Toast.makeText(mainAct, "Error while connecting to network", Toast.LENGTH_SHORT).show();
+						        
+						    }
+						});
+
+					}
+				  }
+				});
+
+				alert.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+				  public void onClick(DialogInterface dialog, int whichButton) {
+				    // Canceled.
+				  }
+				});
+
+				alert.show();
 			}
 		});
 		
