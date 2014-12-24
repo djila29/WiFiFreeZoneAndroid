@@ -95,7 +95,7 @@ public class MainActivity extends Activity {
 			public void run() {
 				try {
 					HttpClient client = new DefaultHttpClient();
-					HttpGet hget = new HttpGet("http://192.168.1.123:8080/FreeZoneServices/api/networks/getAllNetworks");
+					HttpGet hget = new HttpGet("http://jasha.no-ip.biz:8080/FreeZoneServices/api/networks/getAllNetworks");
 					hget.setHeader("Content-Type", "application/json");
 					hget.setHeader("Accept", "application/json");
 					
@@ -149,7 +149,7 @@ public class MainActivity extends Activity {
 		        	
 					HttpClient client = new DefaultHttpClient();
                 	
-                    HttpPut put = new HttpPut("http://192.168.1.123:8080/FreeZoneServices/api/networks/shareNetwork");
+                    HttpPut put = new HttpPut("http://jasha.no-ip.biz:8080/FreeZoneServices/api/networks/shareNetwork");
                     
                     Network net = new Network();
                     net.setSSID(SSID);
