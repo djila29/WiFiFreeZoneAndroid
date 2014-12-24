@@ -36,6 +36,7 @@ import android.net.wifi.WifiManager;
 import android.net.wifi.WpsInfo;
 import android.os.Bundle;
 import android.os.StrictMode;
+import android.text.InputType;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
@@ -59,6 +60,7 @@ public class MainActivity extends Activity {
 	
 	List<Network> networksList = new ArrayList<Network>();
 	List<String> networksStringList = new ArrayList<String>();
+	String wifiPasswordTemp = "";
 	
 	WifiManager mainWifiObj = null;
 	
@@ -87,15 +89,13 @@ public class MainActivity extends Activity {
             	view.setBackgroundColor(Color.CYAN);
             }
         });
-		
-		
-		
+
 		final Runnable getAllNetworks = new Runnable() {
 			@Override
 			public void run() {
 				try {
 					HttpClient client = new DefaultHttpClient();
-					HttpGet hget = new HttpGet("http://192.168.1.100:8080/FreeZoneServices/api/networks/getAllNetworks");
+					HttpGet hget = new HttpGet("http://192.168.1.123:8080/FreeZoneServices/api/networks/getAllNetworks");
 					hget.setHeader("Content-Type", "application/json");
 					hget.setHeader("Accept", "application/json");
 					
@@ -138,6 +138,58 @@ public class MainActivity extends Activity {
 		final Thread tNetworks = new Thread(getAllNetworks);
 		tNetworks.start();
 		
+		final Runnable shareNetwork = new Runnable() {
+			@Override
+		    public void run() {
+		        try {
+		        	TextView textview1 = (TextView) lastSelectedItem.findViewById(R.id.rowTextView);
+	            	String [] networkDetails = textview1.getText().toString().split("\n");
+					final String SSID = networkDetails[0];
+					final String Password = wifiPasswordTemp;
+		        	
+					HttpClient client = new DefaultHttpClient();
+                	
+                    HttpPut put = new HttpPut("http://192.168.1.123:8080/FreeZoneServices/api/networks/shareNetwork");
+                    
+                    Network net = new Network();
+                    net.setSSID(SSID);
+                    net.setPassword(Password);
+                    net.setLatitude("0");
+                    net.setLongitude("0");
+                    net.setValidity("0");
+                    
+                    Gson gson = new Gson();
+                    String json = gson.toJson(net);
+
+                    StringEntity se = new StringEntity(json);
+                    se.setContentType("application/json");
+                    put.setHeader("Content-Type", "application/json");
+                    put.setHeader("Accept", "application/json");
+                    put.setEntity(se);
+                    
+                    final HttpResponse response = client.execute(put);
+
+                    if(response.getStatusLine().getStatusCode() == 204) {
+	                    mainAct.runOnUiThread(new Runnable() {
+						    public void run() {
+						        Toast.makeText(mainAct, "Network shared!", Toast.LENGTH_SHORT).show();
+						        
+						    }
+						});
+                    }
+
+                } catch(final Exception e) {
+                    e.printStackTrace();
+                    mainAct.runOnUiThread(new Runnable() {
+					    public void run() {
+					        Toast.makeText(mainAct, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+					        
+					    }
+					});
+		        }
+		    }
+		};
+		
 		refreshButton.setOnClickListener(new View.OnClickListener() {
 			
 			@Override
@@ -155,12 +207,19 @@ public class MainActivity extends Activity {
 						final List<ScanResult> wifiavailable = mainWifiObj.getScanResults();
 						
 						for(int i = 0; i<wifiavailable.size(); i++) {
-							networksStringList.add(wifiavailable.get(i).SSID + "\n" + wifiavailable.get(i).capabilities);
+							networksStringList.add(wifiavailable.get(i).SSID + "\nSecured");
 						}
 						
 						netoworkAdapter = new ArrayAdapter<String>(mainAct, R.layout.listview_item, networksStringList);
 						
 						networksListView.setAdapter(netoworkAdapter);
+						
+						mainAct.runOnUiThread(new Runnable() {
+						    public void run() {
+						        Toast.makeText(mainAct, "Refreshed!", Toast.LENGTH_SHORT).show();
+						        
+						    }
+						});
 						break;
 					}
 				}
@@ -168,62 +227,12 @@ public class MainActivity extends Activity {
 		});
 		
 		
-		//ovdje nesto ne radi kako treba, NetworkResources kao da samo SSID dobije mapiran, svi ostali budu null pa pada na sql exception
 		shareButton.setOnClickListener(new View.OnClickListener() {
 			
 			@Override
 			public void onClick(View v) {
-				
-				Thread thread = new Thread(new Runnable(){
-				    @Override
-				    public void run() {
-				        try {
-				            //Your code goes here
-				        	TextView textview1 = (TextView) lastSelectedItem.findViewById(R.id.rowTextView);
-			            	String [] networkDetails = textview1.getText().toString().split("\n");
-							final String SSID = networkDetails[0];
-							
-							HttpClient client = new DefaultHttpClient();
-			                HttpConnectionParams.setConnectionTimeout(client.getParams(), 10000); //Timeout Limit
-			                HttpResponse response;
-			                JSONObject jason = new JSONObject();
-
-			                try {
-			                    HttpPut put = new HttpPut("http://192.168.1.100:8080/FreeZoneServices/api/networks/shareNetwork");
-			                    jason.put("SSID", "test");
-								jason.put("Password", SSID);
-								jason.put("Latitude", SSID);
-								jason.put("Longitude", SSID);
-								jason.put("Validity", SSID);
-			                    StringEntity se = new StringEntity( jason.toString());
-			                    se.setContentType(new BasicHeader(HTTP.CONTENT_TYPE, "application/json"));
-			                    put.setHeader("Content-Type", "application/json");
-			                    put.setHeader("Accept", "application/json");
-			                    put.setEntity(se);
-			                    response = client.execute(put);
-
-			                    
-			                    if(response!=null){
-			                        InputStream in = response.getEntity().getContent(); //Get the data in the entity
-			                    }
-
-			                } catch(final Exception e) {
-			                    e.printStackTrace();
-			                    mainAct.runOnUiThread(new Runnable() {
-								    public void run() {
-								        Toast.makeText(mainAct, e.getMessage(), Toast.LENGTH_SHORT).show();
-								        
-								    }
-								});
-			                }
-				        } catch (Exception e) {
-				            e.printStackTrace();
-				        }
-				    }
-				});
-
-				thread.start(); 
-				
+				final Thread tShare = new Thread(shareNetwork);
+				tShare.start();
 			}
 		});
 		
@@ -232,23 +241,78 @@ public class MainActivity extends Activity {
 			@Override
 			public void onClick(View v) {
 				
-				AlertDialog.Builder alert = new AlertDialog.Builder(mainAct);				
-
-				// Set an EditText view to get user input 
-				final EditText input = new EditText(mainAct);
-				alert.setView(input);
-				
-
-            	TextView textview1 = (TextView) lastSelectedItem.findViewById(R.id.rowTextView);
+				TextView textview1 = (TextView) lastSelectedItem.findViewById(R.id.rowTextView);
             	String [] networkDetails = textview1.getText().toString().split("\n");
 				final String SSID = networkDetails[0];
 				
-				alert.setTitle("Connect to " + SSID);
-				alert.setMessage("Enter password:");
-					
-				alert.setPositiveButton("Connect", new DialogInterface.OnClickListener() {
-				public void onClick(DialogInterface dialog, int whichButton) {
-					String password = input.getText().toString();
+				if(networkDetails[1].equals("Secured")) {
+				
+					AlertDialog.Builder alert = new AlertDialog.Builder(mainAct);				
+	
+					// Set an EditText view to get user input 
+					final EditText input = new EditText(mainAct);
+					input.setHint("Password");
+					input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+					alert.setView(input);
+	
+					alert.setTitle("Connect to " + SSID);
+					alert.setMessage("Enter password:");
+						
+					alert.setPositiveButton("Connect", new DialogInterface.OnClickListener() {
+					public void onClick(DialogInterface dialog, int whichButton) {
+						String password = input.getText().toString();
+						wifiPasswordTemp = password;
+					 	// Do something with value!
+					  	WifiConfiguration tmpConf = new WifiConfiguration();
+						tmpConf.SSID = "\"".concat(SSID).concat("\"");
+						tmpConf.status = WifiConfiguration.Status.DISABLED;
+						tmpConf.priority = 40;
+						tmpConf.allowedProtocols.set(WifiConfiguration.Protocol.RSN);
+						tmpConf.allowedProtocols.set(WifiConfiguration.Protocol.WPA);
+						tmpConf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.WPA_PSK);
+						tmpConf.allowedPairwiseCiphers.set(WifiConfiguration.PairwiseCipher.CCMP);
+						tmpConf.allowedPairwiseCiphers.set(WifiConfiguration.PairwiseCipher.TKIP);
+						tmpConf.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.WEP40);
+						tmpConf.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.WEP104);
+						tmpConf.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.CCMP);
+						tmpConf.allowedGroupCiphers.set(WifiConfiguration.GroupCipher.TKIP);
+						 
+						tmpConf.preSharedKey = "\"".concat(password).concat("\"");
+						
+						int netID = mainWifiObj.addNetwork(tmpConf);
+						if (netID != -1) {
+							 // success, can call wfMgr.enableNetwork(networkId, true) to connect
+							mainWifiObj.enableNetwork(netID, true);
+							
+							mainAct.runOnUiThread(new Runnable() {
+							    public void run() {
+							        Toast.makeText(mainAct, "Connected!", Toast.LENGTH_SHORT).show();
+							        
+							    }
+							});
+						} else {
+							mainAct.runOnUiThread(new Runnable() {
+							    public void run() {
+							        Toast.makeText(mainAct, "Error while connecting to network", Toast.LENGTH_SHORT).show();
+							        
+							    }
+							});
+	
+						}
+					  }
+					});
+	
+					alert.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+					  public void onClick(DialogInterface dialog, int whichButton) {
+					    // Canceled.
+					  }
+					});
+	
+					alert.show();
+				}
+				else {
+					String password = networkDetails[1];
+					wifiPasswordTemp = password;
 				 	// Do something with value!
 				  	WifiConfiguration tmpConf = new WifiConfiguration();
 					tmpConf.SSID = "\"".concat(SSID).concat("\"");
@@ -270,6 +334,13 @@ public class MainActivity extends Activity {
 					if (netID != -1) {
 						 // success, can call wfMgr.enableNetwork(networkId, true) to connect
 						mainWifiObj.enableNetwork(netID, true);
+						
+						mainAct.runOnUiThread(new Runnable() {
+						    public void run() {
+						        Toast.makeText(mainAct, "Connected!", Toast.LENGTH_SHORT).show();
+						        
+						    }
+						});
 					} else {
 						mainAct.runOnUiThread(new Runnable() {
 						    public void run() {
@@ -279,16 +350,7 @@ public class MainActivity extends Activity {
 						});
 
 					}
-				  }
-				});
-
-				alert.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-				  public void onClick(DialogInterface dialog, int whichButton) {
-				    // Canceled.
-				  }
-				});
-
-				alert.show();
+				}
 			}
 		});
 		
@@ -302,7 +364,7 @@ public class MainActivity extends Activity {
 				final List<ScanResult> wifiavailable = mainWifiObj.getScanResults();
 				
 				for(int i = 0; i<wifiavailable.size(); i++) {
-					networksStringList.add(wifiavailable.get(i).SSID + "\n" + wifiavailable.get(i).capabilities);
+					networksStringList.add(wifiavailable.get(i).SSID + "\nSecured");
 				}
 				
 				netoworkAdapter = new ArrayAdapter<String>(mainAct, R.layout.listview_item, networksStringList);
